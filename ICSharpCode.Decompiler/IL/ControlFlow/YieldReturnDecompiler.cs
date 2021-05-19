@@ -276,12 +276,12 @@ namespace ICSharpCode.Decompiler.IL.ControlFlow
 				if (!body.Instructions[pos].MatchStLoc(out var1, out newObj))
 					return false;
 			}
-			if (MatchEnumeratorCreationNewObj(newObj))
+			/*if (MatchEnumeratorCreationNewObj(newObj))
 			{
 				pos++; // OK
 				isCompiledWithMono = false;
 			}
-			else if (MatchMonoEnumeratorCreationNewObj(newObj))
+			else*/ if (MatchMonoEnumeratorCreationNewObj(newObj))
 			{
 				pos++;
 				isCompiledWithMono = true;
@@ -336,11 +336,19 @@ namespace ICSharpCode.Decompiler.IL.ControlFlow
 					pos++;
 				}
 			}
-			if (body.Instructions[pos].MatchReturn(out var retVal)
-				&& retVal.MatchLdLoc(var2 ?? var1))
+			if (body.Instructions[pos].MatchReturn(out var retVal))
 			{
-				// ret(ldloc(var_2))
-				return true;
+				if(retVal.MatchLdLoc(var2 ?? var1))
+				{
+					// ret(ldloc(var_2))
+					return true;
+				}
+				else if(retVal.MatchCastClass(out var retArg, out var retType) && retArg.MatchLdLoc(var2 ?? var1)) // TODO verify enumerable type
+				{
+					return true;
+				}
+
+				return false;
 			}
 			else
 			{
@@ -397,13 +405,13 @@ namespace ICSharpCode.Decompiler.IL.ControlFlow
 			// mcs generates iterators that take no parameters in the ctor
 			if (!(inst is NewObj newObj))
 				return false;
-			if (newObj.Arguments.Count != 0 && newObj.Arguments.Count != 1)
-				return false;
+			/*if (newObj.Arguments.Count != 0 && newObj.Arguments.Count != 1)
+				return false;*/
 			var handle = newObj.Method.MetadataToken;
 			enumeratorCtor = handle.IsNil || handle.Kind != HandleKind.MethodDefinition ? default : (MethodDefinitionHandle)handle;
 			enumeratorType = enumeratorCtor.IsNil ? default : metadata.GetMethodDefinition(enumeratorCtor).GetDeclaringType();
 			return (enumeratorType.IsNil ? default : metadata.GetTypeDefinition(enumeratorType).GetDeclaringType()) == currentType
-				/*&& IsCompilerGeneratorEnumerator(enumeratorType, metadata)*/;
+				&& IsCompilerGeneratorEnumerator(enumeratorType, metadata);
 		}
 
 		public static bool IsCompilerGeneratorEnumerator(TypeDefinitionHandle type, MetadataReader metadata)
@@ -485,7 +493,18 @@ namespace ICSharpCode.Decompiler.IL.ControlFlow
 				m => (metadata.GetString(metadata.GetMethodDefinition(m).Name).StartsWith("System.Collections.Generic.IEnumerator", StringComparison.Ordinal)
 				|| metadata.GetString(metadata.GetMethodDefinition(m).Name).StartsWith("System.Collections.IEnumerator", StringComparison.Ordinal))
 				&& metadata.GetString(metadata.GetMethodDefinition(m).Name).EndsWith(".get_Current", StringComparison.Ordinal));
-			Block body = SingleBlock(CreateILAst(getCurrentMethod, context).Body);
+
+			ILInstruction ast = CreateILAst(getCurrentMethod, context).Body;
+			BlockContainer container = ast as BlockContainer;
+			if(container == null)
+				throw new SymbolicAnalysisFailedException();
+
+			Block body = null;
+			if (container.Blocks.Count == 1)
+				body = container.Blocks.Single() as Block;
+			else if (container.Blocks.Count == 3)
+				body = container.Blocks[2] as Block; // TODO verify blocks 0, 1
+
 			if (body == null)
 				throw new SymbolicAnalysisFailedException("get_Current has no body");
 			if (body.Instructions.Count == 1)
@@ -522,7 +541,8 @@ namespace ICSharpCode.Decompiler.IL.ControlFlow
 		void ResolveIEnumerableIEnumeratorFieldMapping()
 		{
 			MethodDefinitionHandle getEnumeratorMethod = metadata.GetTypeDefinition(enumeratorType).GetMethods().FirstOrDefault(
-				m => metadata.GetString(metadata.GetMethodDefinition(m).Name).StartsWith("System.Collections.Generic.IEnumerable", StringComparison.Ordinal)
+				m => (metadata.GetString(metadata.GetMethodDefinition(m).Name).StartsWith("System.Collections.Generic.IEnumerable", StringComparison.Ordinal)
+				|| metadata.GetString(metadata.GetMethodDefinition(m).Name).StartsWith("System.Collections.IEnumerable", StringComparison.Ordinal))
 				&& metadata.GetString(metadata.GetMethodDefinition(m).Name).EndsWith(".GetEnumerator", StringComparison.Ordinal));
 			ResolveIEnumerableIEnumeratorFieldMapping(getEnumeratorMethod, context, fieldToParameterMap);
 		}
@@ -630,8 +650,11 @@ namespace ICSharpCode.Decompiler.IL.ControlFlow
 				if (faultBlockContainer?.Blocks.Count != 1)
 					throw new SymbolicAnalysisFailedException("Unexpected number of blocks in MoveNext() fault block");
 				var faultBlock = faultBlockContainer.Blocks.Single();
+				Call callNorm = faultBlock.Instructions[0] as Call;
+				CallVirt callVirt = faultBlock.Instructions[0] as CallVirt;
+				CallInstruction call = (callNorm == null ? callVirt : callNorm);
 				if (!(faultBlock.Instructions.Count == 2
-					&& faultBlock.Instructions[0] is Call call
+					&& call != null
 					&& call.Method.MetadataToken == disposeMethod
 					&& call.Arguments.Count == 1
 					&& call.Arguments[0].MatchLdThis()
