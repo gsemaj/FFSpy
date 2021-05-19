@@ -76,7 +76,7 @@ namespace ICSharpCode.Decompiler.IL.ControlFlow
 
 		private static void RemoveDeadStackStores(Block block, ILTransformContext context)
 		{
-			bool aggressive = context.Settings.RemoveDeadStores;
+			bool aggressive = true;
 			// Previously copy propagation did this;
 			// ideally the ILReader would already do this,
 			// for now do this here (even though it's not control-flow related).
