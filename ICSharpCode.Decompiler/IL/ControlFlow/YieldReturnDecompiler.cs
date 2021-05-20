@@ -253,7 +253,11 @@ namespace ICSharpCode.Decompiler.IL.ControlFlow
 
 			// stloc(var_1, newobj(..))
 			if (!body.Instructions[pos].MatchStLoc(out var var1, out newObj))
-				return false;
+			{
+				pos++;
+				if (!body.Instructions[pos].MatchStLoc(out var1, out newObj))
+					return false;
+			}
 			if (MatchEnumeratorCreationNewObj(newObj))
 			{
 				pos++; // OK
@@ -375,13 +379,13 @@ namespace ICSharpCode.Decompiler.IL.ControlFlow
 			// mcs generates iterators that take no parameters in the ctor
 			if (!(inst is NewObj newObj))
 				return false;
-			if (newObj.Arguments.Count != 0)
+			if (newObj.Arguments.Count != 0 && newObj.Arguments.Count != 1)
 				return false;
 			var handle = newObj.Method.MetadataToken;
 			enumeratorCtor = handle.IsNil || handle.Kind != HandleKind.MethodDefinition ? default : (MethodDefinitionHandle)handle;
 			enumeratorType = enumeratorCtor.IsNil ? default : metadata.GetMethodDefinition(enumeratorCtor).GetDeclaringType();
 			return (enumeratorType.IsNil ? default : metadata.GetTypeDefinition(enumeratorType).GetDeclaringType()) == currentType
-				&& IsCompilerGeneratorEnumerator(enumeratorType, metadata);
+				/*&& IsCompilerGeneratorEnumerator(enumeratorType, metadata)*/;
 		}
 
 		public static bool IsCompilerGeneratorEnumerator(TypeDefinitionHandle type, MetadataReader metadata)
@@ -458,8 +462,10 @@ namespace ICSharpCode.Decompiler.IL.ControlFlow
 		/// </summary>
 		void AnalyzeCurrentProperty()
 		{
+			MethodDefinitionHandleCollection col = metadata.GetTypeDefinition(enumeratorType).GetMethods();
 			MethodDefinitionHandle getCurrentMethod = metadata.GetTypeDefinition(enumeratorType).GetMethods().FirstOrDefault(
-				m => metadata.GetString(metadata.GetMethodDefinition(m).Name).StartsWith("System.Collections.Generic.IEnumerator", StringComparison.Ordinal)
+				m => (metadata.GetString(metadata.GetMethodDefinition(m).Name).StartsWith("System.Collections.Generic.IEnumerator", StringComparison.Ordinal)
+				|| metadata.GetString(metadata.GetMethodDefinition(m).Name).StartsWith("System.Collections.IEnumerator", StringComparison.Ordinal))
 				&& metadata.GetString(metadata.GetMethodDefinition(m).Name).EndsWith(".get_Current", StringComparison.Ordinal));
 			Block body = SingleBlock(CreateILAst(getCurrentMethod, context).Body);
 			if (body == null)
@@ -469,7 +475,7 @@ namespace ICSharpCode.Decompiler.IL.ControlFlow
 				// release builds directly return the current field
 				// ret(ldfld F(ldloc(this)))
 				if (body.Instructions[0].MatchReturn(out var retVal)
-					&& retVal.MatchLdFld(out var target, out var field)
+					&& (retVal.MatchLdFld(out var target, out var field) || (retVal is Box rvBox && rvBox.Children.Count == 1 && rvBox.Children[0].MatchLdFld(out target, out field)))
 					&& target.MatchLdThis())
 				{
 					currentField = (IField)field.MemberDefinition;
