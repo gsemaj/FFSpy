@@ -90,6 +90,7 @@
     <Compile Include="IL\Instructions\DeconstructInstruction.cs" />
     <Compile Include="IL\Instructions\DeconstructResultInstruction.cs" />
     <Compile Include="IL\Instructions\MatchInstruction.cs" />
+    <Compile Include="IL\Transforms\FixSelfReference.cs" />
     <Compile Include="IL\Transforms\IndexRangeTransform.cs" />
     <Compile Include="CSharp\TranslatedStatement.cs" />
     <Compile Include="DebugInfo\KnownGuids.cs" />

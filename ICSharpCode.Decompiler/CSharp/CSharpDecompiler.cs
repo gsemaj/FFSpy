@@ -157,6 +157,7 @@ namespace ICSharpCode.Decompiler.CSharp
 				new FixRemainingIncrements(),
 				new FixLoneIsInst(),
 				new CopyPropagation(),
+				new FixSelfReference(),
 				new DelegateConstruction(),
 				new LocalFunctionDecompiler(),
 				new TransformDisplayClassUsage(),
