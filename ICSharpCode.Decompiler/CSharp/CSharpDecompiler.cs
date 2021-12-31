@@ -153,6 +153,7 @@ namespace ICSharpCode.Decompiler.CSharp
 				new ProxyCallReplacer(),
 				new FixRemainingIncrements(),
 				new FixLoneIsInst(),
+				new FixCompilerGeneratedThis(),
 				new CopyPropagation(),
 				new FixSelfReference(),
 				new DelegateConstruction(),

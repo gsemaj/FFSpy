@@ -80,6 +80,7 @@
     <Compile Include="Humanizer\Vocabularies.cs" />
     <Compile Include="Humanizer\Vocabulary.cs" />
     <Compile Include="IL\Transforms\DeconstructionTransform.cs" />
+    <Compile Include="IL\Transforms\FixCompilerGeneratedThis.cs" />
     <Compile Include="IL\Transforms\FixLoneIsInst.cs" />
     <Compile Include="IL\Instructions\DeconstructInstruction.cs" />
     <Compile Include="IL\Instructions\DeconstructResultInstruction.cs" />
