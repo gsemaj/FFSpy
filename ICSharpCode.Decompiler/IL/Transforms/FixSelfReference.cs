@@ -23,12 +23,12 @@ namespace ICSharpCode.Decompiler.IL.Transforms
 		{
 			for (int i = 0; i < block.Instructions.Count; i++)
 			{
-				if(block.Instructions[i].MatchStObj(out ILInstruction targSt, out ILInstruction value, out IType typeSt))
+				if (block.Instructions[i].MatchStObj(out ILInstruction targSt, out ILInstruction value, out IType typeSt))
 				{
-					if(value.MatchLdObj(out ILInstruction targLd, out IType typeLd))
+					if (value.MatchLdObj(out ILInstruction targLd, out IType typeLd))
 					{
 						// types do not match
-						if (typeSt != typeLd)
+						if (!typeSt.Equals(typeLd))
 							continue;
 
 						// op codes do not match
@@ -43,6 +43,24 @@ namespace ICSharpCode.Decompiler.IL.Transforms
 
 						// ensure the targets are for the same field
 						if (instSt.Field != instLd.Field)
+							continue;
+
+						// strip the instruction
+						block.Instructions.RemoveAt(i);
+						int c = ILInlining.InlineInto(block, i, InliningOptions.None, context: context);
+						i -= c + 1;
+					}
+				}
+				else if (block.Instructions[i].MatchStLoc(out ILVariable varSt, out ILInstruction inst))
+				{
+					if(inst.MatchLdLoc(out ILVariable varLd))
+					{
+						// types do not match
+						if (!varSt.Type.Equals(varLd.Type))
+							continue;
+
+						// names do not match
+						if (!varSt.Name.Equals(varLd.Name))
 							continue;
 
 						// strip the instruction
