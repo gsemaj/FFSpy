@@ -49,17 +49,65 @@ namespace ICSharpCode.Decompiler.IL.Transforms
 					// set variable type to the same type as `this`
 					vari.Type = (arg as IInstructionWithVariableOperand).Variable.Type;
 
-					// iterate through uses and simplify them
+					// first pass to simplify basic wrapper
 					var loads = vari.LoadInstructions.ToArray();
+					var nestedFields = new List<(IField f, ILVariable p)>();
 					foreach (var exp in loads)
 					{
-						ILInstruction wrapper = exp.Parent.Parent;
-						if (wrapper != null && MatchWrapper(wrapper, vari.Type))
-							wrapper.ReplaceWith(new LdLoc(vari));
+						ILInstruction loadInstr = exp.Parent.Parent;
+
+						// if just a wrapper for `this`, simplify immediately
+						if (MatchWrapper(loadInstr, vari.Type))
+						{
+							loadInstr.ReplaceWith(new LdLoc(vari));
+							continue;
+						}
+
+						// if it's copying the param to an extra field, make a note to replace references
+						if (MatchNestedField(loadInstr, vari.Type, out ILInstruction param, out IField field))
+						{
+							// i actually can't figure out how to straight up remove this instruction safely within the loop, so
+							// instead replace it with a nop and clean it up later
+							// i don't think there are any other nops in the code at this point, so this should be safe
+							loadInstr.ReplaceWith(new Nop());
+							// make note of this field so we can replace all references to it later
+							nestedFields.Add((field, (param as IInstructionWithVariableOperand).Variable));
+						}
+					}
+
+					// second pass to find and replace references to any nested fields
+					loads = vari.LoadInstructions.ToArray();
+					foreach(var exp in loads)
+					{
+						ILInstruction loadInstr = exp.Parent;
+						foreach(var sub in nestedFields)
+						{
+							if (MatchNestedFieldReference(loadInstr, sub.f))
+							{
+								loadInstr.ReplaceWith(new LdLoca(sub.p));
+								break;
+							}
+						}
 					}
 
 					// replace cgo with a simple reference that will get cleaned up by CopyPropogation
 					block.Instructions[i].ReplaceWith(new StLoc(vari, arg));
+				}
+			}
+
+			CleanupNops(block, context); // get rid of those nops we put in
+		}
+
+		static void CleanupNops(Block block, ILTransformContext context)
+		{
+			for(int i = 0; i < block.Instructions.Count; i++)
+			{
+				if(block.Instructions[i].MatchNop())
+				{
+					// remove instruction
+					block.Instructions.RemoveAt(i);
+					int c = ILInlining.InlineInto(block, i, InliningOptions.None, context: context);
+					i -= c + 1;
 				}
 			}
 		}
@@ -69,6 +117,34 @@ namespace ICSharpCode.Decompiler.IL.Transforms
 			if(inst.MatchLdObj(out ILInstruction targ, out IType type))
 			{
 				return type.Equals(thisType);
+			}
+
+			return false;
+		}
+
+		static bool MatchNestedField(ILInstruction inst, IType thisType, out ILInstruction param, out IField nField)
+		{
+			param = null;
+			nField = null;
+
+			if(inst.MatchStObj(out ILInstruction targ, out ILInstruction val, out IType type))
+			{
+				if(targ.MatchLdFlda(out _, out IField field) && field.DeclaringType.DeclaringType.Equals(thisType) && val.MatchLdLoc(out _))
+				{
+					param = val;
+					nField = field;
+					return true;
+				}
+			}
+
+			return false;
+		}
+
+		static bool MatchNestedFieldReference(ILInstruction inst, IField nestedField)
+		{
+			if (inst.MatchLdFlda(out ILInstruction targ, out IField fieldRef))
+			{
+				return nestedField.Equals(fieldRef);
 			}
 
 			return false;
