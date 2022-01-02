@@ -1037,11 +1037,22 @@ namespace ICSharpCode.Decompiler.IL.ControlFlow
 					string name = null;
 					if (!string.IsNullOrEmpty(fieldDef.Name) && fieldDef.Name[0] == '<')
 					{
-						int pos = fieldDef.Name.IndexOf('>');
+						int pos = fieldDef.Name.LastIndexOf('>');
 						if (pos > 1)
 							name = fieldDef.Name.Substring(1, pos - 1);
 					}
-					v = function.RegisterVariable(VariableKind.Local, ldflda.Field.ReturnType, name);
+
+					if(name != null && name.Contains("THIS"))
+					{
+						v = new ILVariable(VariableKind.Parameter, ldflda.Field.ReturnType, -1);
+						v.Name = name;
+						function.Variables.Add(v);
+					}
+					else
+					{
+						v = function.RegisterVariable(VariableKind.Local, ldflda.Field.ReturnType, name);
+					}
+					
 					v.InitialValueIsInitialized = true; // the field was default-initialized, so keep those semantics for the variable
 					v.UsesInitialValue = true;
 					v.StateMachineField = ldflda.Field;
