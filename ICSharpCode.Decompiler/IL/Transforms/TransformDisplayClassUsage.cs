@@ -436,7 +436,9 @@ namespace ICSharpCode.Decompiler.IL.Transforms
 		{
 			try
 			{
-				if (method.Parameters.Count != 0)
+				if (method.Parameters.Count > 1)
+					return false;
+				if (method.Parameters.Count == 1 && !method.DeclaringType.DeclaringType.Equals(method.Parameters[0].Type))
 					return false;
 				var handle = (MethodDefinitionHandle)method.MetadataToken;
 				var module = (MetadataModule)method.ParentModule;
@@ -483,7 +485,7 @@ namespace ICSharpCode.Decompiler.IL.Transforms
 					return false;
 				if (!objectCtor.IsConstructor || objectCtor.Parameters.Count != 0)
 					return false;
-				return DecodeOpCodeSkipNop(ref reader) == ILOpCode.Ret;
+				return true;
 			}
 			catch (BadImageFormatException)
 			{

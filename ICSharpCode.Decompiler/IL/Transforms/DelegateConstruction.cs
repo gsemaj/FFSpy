@@ -157,8 +157,8 @@ namespace ICSharpCode.Decompiler.IL.Transforms
 				{
 					if (t is ITypeParameter tp)
 						methodTypeParameters.Add(tp);
-					else
-						return null;
+					//else
+					//	return null;
 				}
 			}
 			return new GenericContext(classTypeParameters, methodTypeParameters);
