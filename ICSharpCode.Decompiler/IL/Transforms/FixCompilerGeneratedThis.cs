@@ -51,7 +51,7 @@ namespace ICSharpCode.Decompiler.IL.Transforms
 
 					// first pass to simplify basic wrapper
 					var loads = vari.LoadInstructions.ToArray();
-					var nestedFields = new List<(IField f, ILVariable p)>();
+					var nestedFields = new List<(IField f, ILInstruction p)>();
 					foreach (var exp in loads)
 					{
 						ILInstruction loadInstr = exp.Parent.Parent;
@@ -71,7 +71,7 @@ namespace ICSharpCode.Decompiler.IL.Transforms
 							// i don't think there are any other nops in the code at this point, so this should be safe
 							loadInstr.ReplaceWith(new Nop());
 							// make note of this field so we can replace all references to it later
-							nestedFields.Add((field, (param as IInstructionWithVariableOperand).Variable));
+							nestedFields.Add((field, param));
 						}
 					}
 
@@ -84,7 +84,15 @@ namespace ICSharpCode.Decompiler.IL.Transforms
 						{
 							if (MatchNestedFieldReference(loadInstr, sub.f))
 							{
-								loadInstr.ReplaceWith(new LdLoca(sub.p));
+								if(sub.p.MatchLdLoc(out _))
+								{
+									loadInstr.ReplaceWith(new LdLoca((sub.p as IInstructionWithVariableOperand).Variable));
+								}
+								else if(sub.p.MatchUnbox(out _, out _))
+								{
+									loadInstr.ReplaceWith(sub.p.Clone());
+								}
+								
 								break;
 							}
 						}
@@ -129,11 +137,21 @@ namespace ICSharpCode.Decompiler.IL.Transforms
 
 			if(inst.MatchStObj(out ILInstruction targ, out ILInstruction val, out IType type))
 			{
-				if(targ.MatchLdFlda(out _, out IField field) && field.DeclaringType.DeclaringType.Equals(thisType) && val.MatchLdLoc(out _))
+				if(targ.MatchLdFlda(out _, out IField field) && field.DeclaringType.DeclaringType.Equals(thisType))
 				{
-					param = val;
-					nField = field;
-					return true;
+					if(val.MatchLdLoc(out _))
+					{
+						param = val;
+						nField = field;
+						return true;
+					}
+
+					if (val.MatchLdObj(out ILInstruction unbox, out _))
+					{
+						param = unbox;
+						nField = field;
+						return true;
+					}
 				}
 			}
 

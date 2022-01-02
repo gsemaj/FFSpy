@@ -93,6 +93,7 @@
     <Compile Include="Documentation\XmlDocumentationElement.cs" />
     <Compile Include="IL\ControlFlow\AwaitInFinallyTransform.cs" />
     <Compile Include="IL\Transforms\IntroduceNativeIntTypeOnLocals.cs" />
+    <Compile Include="IL\Transforms\RemoveCompilerGeneratedThis.cs" />
     <Compile Include="Metadata\ReferenceLoadInfo.cs" />
     <Compile Include="Semantics\OutVarResolveResult.cs" />
     <Compile Include="SingleFileBundle.cs" />

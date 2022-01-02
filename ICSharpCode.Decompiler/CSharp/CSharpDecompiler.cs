@@ -164,6 +164,7 @@ namespace ICSharpCode.Decompiler.CSharp
 				new IntroduceDynamicTypeOnLocals(),
 				new IntroduceNativeIntTypeOnLocals(),
 				new AssignVariableNames(),
+				new RemoveCompilerGeneratedThis()
 			};
 		}
 
