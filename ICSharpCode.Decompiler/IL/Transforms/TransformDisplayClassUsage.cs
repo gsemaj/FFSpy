@@ -875,7 +875,15 @@ namespace ICSharpCode.Decompiler.IL.Transforms
 			var v = displayClass.VariablesToDeclare[keyField];
 			context.Step($"Replace {field.Name} with captured variable {v.Name}", inst);
 			ILVariable variable = v.GetOrDeclare();
-			inst.ReplaceWith(new LdLoca(variable).WithILRange(inst));
+			ILVariable thisRef = variable.Function.Variables[0]; // always 0?
+			if (variable.Name.Contains("THIS") && thisRef.Type.Equals(field.Type))
+			{
+				inst.Parent.ReplaceWith(new LdLoc(thisRef).WithILRange(inst.Parent));
+			}
+			else
+			{
+				inst.ReplaceWith(new LdLoca(variable).WithILRange(inst));
+			}
 			// add captured variable to all descendant functions from the declaring function to this use-site function
 			foreach (var f in currentFunctions)
 			{
