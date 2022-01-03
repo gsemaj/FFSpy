@@ -31,36 +31,16 @@ namespace ICSharpCode.Decompiler.IL.Transforms
 						if (!typeSt.Equals(typeLd))
 							continue;
 
-						// op codes do not match
-						if (targSt.OpCode != targLd.OpCode)
-							continue;
-
 						// ensure the targets are for actual fields
-						IInstructionWithFieldOperand instSt = targSt as IInstructionWithFieldOperand;
-						IInstructionWithFieldOperand instLd = targLd as IInstructionWithFieldOperand;
-						if (instSt == null)
+						if (!targSt.MatchLdFlda(out ILInstruction targFieldSt, out IField fieldSt) || !targLd.MatchLdFlda(out ILInstruction targFieldLd, out IField fieldLd))
 							continue;
 
-						// ensure the targets are for the same field
-						if (instSt.Field != instLd.Field)
+						// ensure the field types are the same
+						if (fieldSt != fieldLd)
 							continue;
 
-						// strip the instruction
-						block.Instructions.RemoveAt(i);
-						int c = ILInlining.InlineInto(block, i, InliningOptions.None, context: context);
-						i -= c + 1;
-					}
-				}
-				else if (block.Instructions[i].MatchStLoc(out ILVariable varSt, out ILInstruction inst))
-				{
-					if(inst.MatchLdLoc(out ILVariable varLd))
-					{
-						// types do not match
-						if (!varSt.Type.Equals(varLd.Type))
-							continue;
-
-						// names do not match
-						if (!varSt.Name.Equals(varLd.Name))
+						// match the targets
+						if (!targFieldSt.Match(targFieldLd).Success)
 							continue;
 
 						// strip the instruction
@@ -69,6 +49,24 @@ namespace ICSharpCode.Decompiler.IL.Transforms
 						i -= c + 1;
 					}
 				}
+				//else if (block.Instructions[i].MatchStLoc(out ILVariable varSt, out ILInstruction inst))
+				//{
+				//	if(inst.MatchLdLoc(out ILVariable varLd))
+				//	{
+				//		// types do not match
+				//		if (!varSt.Type.Equals(varLd.Type))
+				//			continue;
+
+				//		// names do not match
+				//		if (!varSt.Name.Equals(varLd.Name))
+				//			continue;
+
+				//		// strip the instruction
+				//		block.Instructions.RemoveAt(i);
+				//		int c = ILInlining.InlineInto(block, i, InliningOptions.None, context: context);
+				//		i -= c + 1;
+				//	}
+				//}
 			}
 		}
 	}
